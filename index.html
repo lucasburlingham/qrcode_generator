@@ -77,6 +77,20 @@
 			outline: none;
 		}
 
+		.field input[type="checkbox"] {
+			width: auto;
+			height: auto;
+			padding: 0;
+			margin-right: 8px;
+			border: 0;
+			background: none;
+		}
+
+		.checkbox-field {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+		}
 		.color-row input[type="color"] {
 			width: 2.5em;
 			height: 2.5em;
@@ -217,11 +231,11 @@
 				</div>
 			</div>
 
-			<div class="field">
+			<div class="field checkbox-field">
 				<label for="shadow-input">
+					<input id="shadow-input" type="checkbox" />
 					Add drop shadow
 				</label>
-				<input id="shadow-input" type="checkbox" />
 			</div>
 
 			<div class="field">
@@ -357,6 +371,40 @@
 			URL.revokeObjectURL(url);
 		}
 
+		function parseQueryParams() {
+			const params = new URLSearchParams(window.location.search);
+			if (params.has('text')) textInput.value = params.get('text');
+			if (params.has('size')) sizeInput.value = params.get('size');
+			if (params.has('fg')) fgInput.value = params.get('fg');
+			if (params.has('bg')) bgInput.value = params.get('bg');
+			if (params.has('padding')) paddingInput.value = params.get('padding');
+			if (params.has('shadow')) {
+				const val = params.get('shadow');
+				shadowInput.checked = (val === '1' || val?.toLowerCase() === 'true');
+			}
+			paddingValue.innerText = `${paddingInput.value}px`;
+			return {
+				filetype: params.get('filetype')?.toLowerCase(),
+				download: params.get('download') !== '0'
+			};
+		}
+
+		function attemptAutoDownload(filetype) {
+			if (!filetype) return;
+			const type = filetype.toLowerCase();
+			if (type === 'png') {
+				const dataUrl = canvas.toDataURL('image/png');
+				downloadDataURL(dataUrl, 'qrcode.png');
+			} else if (type === 'jpg' || type === 'jpeg') {
+				const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+				downloadDataURL(dataUrl, 'qrcode.jpg');
+			} else if (type === 'svg') {
+				downloadSVG('qrcode.svg');
+			} else {
+				console.warn('Unsupported filetype specified in query:', filetype);
+			}
+		}
+
 		generateBtn.addEventListener('click', renderQRCode);
 
 		// Live preview while typing/adjusting parameters
@@ -388,8 +436,15 @@
 			downloadSVG('qrcode.svg');
 		});
 
-		// Generate initial example QR code
-		window.addEventListener('DOMContentLoaded', renderQRCode);
+		// Generate initial example QR code (and support GET config / download)
+		window.addEventListener('DOMContentLoaded', () => {
+			const query = parseQueryParams();
+			renderQRCode();
+			if (query.filetype && query.download !== false) {
+				// allow render to finish before downloading
+				setTimeout(() => attemptAutoDownload(query.filetype), 250);
+			}
+		});
 	</script>
 </body>
 
