@@ -140,7 +140,31 @@ if ($method === 'POST')
 	respond(201, ['data' => ['code' => $code, 'url' => $url, 'short_url' => $shortUrl]]);
 }
 
-if (in_array($method, ['PUT', 'PATCH', 'DELETE']))
+if ($method === 'DELETE')
+{
+	if ($sub === '')
+	{
+		respond(400, ['error' => 'Missing code']);
+	}
+
+	if (!preg_match('/^[a-zA-Z0-9]{4}$/', $sub))
+	{
+		respond(400, ['error' => 'Invalid code']);
+	}
+
+	$pdo = getPDO();
+	$stmt = $pdo->prepare('DELETE FROM links WHERE code = :code');
+	$stmt->execute([':code' => $sub]);
+
+	if ($stmt->rowCount() === 0)
+	{
+		respond(404, ['error' => 'Not found']);
+	}
+
+	respond(200, ['data' => ['code' => $sub, 'deleted' => true]]);
+}
+
+if (in_array($method, ['PUT', 'PATCH']))
 {
 	respond(405, ['error' => 'Updates not allowed for shortened links']);
 }

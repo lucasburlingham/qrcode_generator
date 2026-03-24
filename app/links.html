@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>All Shortened Links</title>
+  <style>
+    body { margin:0; padding:20px; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #f4f7fb; color:#1f2b44; }
+    .container { max-width:1200px; margin:0 auto; }
+    h1 { margin-top:0; }
+    .toolbar { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+    .toolbar button { border:0; border-radius:8px; background:#2563eb; color:#fff; padding:10px 14px; cursor:pointer; }
+    .offer { color:#475569; font-size:.9rem; margin-bottom:10px; }
+    table { width:100%; border-collapse:collapse; background:#fff; border-radius:12px; overflow:hidden; }
+    th,td { text-align:left; padding:10px 12px; border-bottom:1px solid #e2e8f0; }
+    th { background:#f8fafc; font-weight:700; }
+    td a { color:#1d4ed8; text-decoration:none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>All Shortened Links</h1>
+    <div class="toolbar">
+      <button id="refresh-links">Refresh</button>
+      <input id="filter-links" type="text" placeholder="Filter by code or URL" style="flex:1; min-width:220px; padding:10px 12px; border:1px solid #dce5f2; border-radius:8px;" />
+      <a href="/" style="display:inline-flex; align-items:center; padding:10px 14px; border-radius:8px; background:#64748b; color:#fff; text-decoration:none;">Back to QR generator</a>
+    </div>
+    <p id="status" class="offer">Click refresh to load all links.</p>
+    <div style="overflow-x:auto;">
+      <table id="links-table" style="display:none; min-width:720px;">
+        <thead>
+          <tr>
+            <th><button class="sort-btn" data-field="code" style="background:none;border:none;color:#1d4ed8;cursor:pointer;">Code</button></th>
+            <th><button class="sort-btn" data-field="url" style="background:none;border:none;color:#1d4ed8;cursor:pointer;">Original URL</button></th>
+            <th><button class="sort-btn" data-field="short_url" style="background:none;border:none;color:#1d4ed8;cursor:pointer;">Short URL</button></th>
+            <th><button class="sort-btn" data-field="created_at" style="background:none;border:none;color:#1d4ed8;cursor:pointer;">Created At</button></th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="links-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+    const statusEl = document.getElementById('status');
+    const linksTable = document.getElementById('links-table');
+    const linksBody = document.getElementById('links-table-body');
+    const refreshBtn = document.getElementById('refresh-links');
+    const filterInput = document.getElementById('filter-links');
+    const sortingButtons = Array.from(document.querySelectorAll('.sort-btn'));
+
+    let savedLinks = [];
+    let sortBy = 'created_at';
+    let sortDirection = 'desc';
+    let filterText = '';
+
+    function renderLinks() {
+      const normalizedFilter = filterText.trim().toLowerCase();
+      let items = savedLinks.filter(item => {
+        if (!normalizedFilter) return true;
+        return item.code.toLowerCase().includes(normalizedFilter)
+          || item.url.toLowerCase().includes(normalizedFilter)
+          || (`/s/${item.code}`).toLowerCase().includes(normalizedFilter);
+      });
+
+      items.sort((a, b) => {
+        let aVal = a[sortBy] || '';
+        let bVal = b[sortBy] || '';
+
+        if (sortBy === 'created_at') {
+          aVal = new Date(aVal).getTime();
+          bVal = new Date(bVal).getTime();
+        } else {
+          aVal = aVal.toString().toLowerCase();
+          bVal = bVal.toString().toLowerCase();
+        }
+
+        if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+
+      linksBody.innerHTML = '';
+
+      if (!items.length) {
+        linksTable.style.display = 'none';
+        statusEl.textContent = 'No matching links found.';
+        return;
+      }
+
+      for (const item of items) {
+        const row = document.createElement('tr');
+        const created = new Date(item.created_at).toLocaleString();
+
+        row.innerHTML = `
+          <td>${item.code}</td>
+          <td><a href="${item.url}" target="_blank" rel="noopener">${item.url}</a></td>
+          <td><a href="/s/${item.code}" target="_blank" rel="noopener">/s/${item.code}</a></td>
+          <td>${created}</td>
+          <td><button class="delete-btn" data-code="${item.code}" style="background:#ef4444; color:#fff; border:none; border-radius:6px; padding:6px 10px; cursor:pointer;">Delete</button></td>
+        `;
+
+        linksBody.appendChild(row);
+      }
+
+      Array.from(linksBody.querySelectorAll('.delete-btn')).forEach(button => {
+        button.addEventListener('click', async (event) => {
+          const code = event.target.dataset.code;
+          if (!confirm(`Delete short link for code ${code}?`)) return;
+
+          try {
+            const res = await fetch(`/api/links/${encodeURIComponent(code)}`, { method: 'DELETE' });
+            if (!res.ok) {
+              const errData = await res.json().catch(() => null);
+              throw new Error(errData?.error || 'Failed to delete');
+            }
+            statusEl.textContent = `Link ${code} deleted.`;
+            await refreshLinks();
+          } catch (err) {
+            console.error(err);
+            statusEl.textContent = 'Error deleting link: ' + err.message;
+          }
+        });
+      });
+
+      linksTable.style.display = 'table';
+      statusEl.textContent = `Loaded ${items.length} link${items.length === 1 ? '' : 's'}.`;
+    }
+
+    async function refreshLinks() {
+      statusEl.textContent = 'Loading links...';
+      linksBody.innerHTML = '';
+      linksTable.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/links');
+        if (!res.ok) throw new Error('Failed to load links');
+        const result = await res.json();
+        savedLinks = result.data || [];
+
+        if (!savedLinks.length) {
+          statusEl.textContent = 'No shortened links found.';
+          return;
+        }
+
+        renderLinks();
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'Error loading links: ' + err.message;
+      }
+    }
+
+    refreshBtn.addEventListener('click', refreshLinks);
+    filterInput.addEventListener('input', (ev) => {
+      filterText = ev.target.value;
+      renderLinks();
+    });
+
+    sortingButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const field = button.dataset.field;
+        if (sortBy === field) {
+          sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortBy = field;
+          sortDirection = 'asc';
+        }
+        renderLinks();
+      });
+    });
+
+    window.addEventListener('DOMContentLoaded', refreshLinks);
+  </script>
+</body>
+</html>
