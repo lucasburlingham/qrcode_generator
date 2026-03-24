@@ -6,8 +6,10 @@ applyTo: '*.md'
 When editing or creating Markdown files in this repository, use GitHub-flavored Markdown (GFM). Ensure:
 
 - Headings use `#` syntax.
+- Add a blank line before and after heading blocks for clarity and compatibility.
 - Code blocks use triple backticks with optional language.
 - Lists are properly indented.
+- Add a blank line before and after list blocks to avoid parser ambiguity.
 - Tables use pipe-delimited rows with header separators.
 - Links and images use `[]()` format.
 
