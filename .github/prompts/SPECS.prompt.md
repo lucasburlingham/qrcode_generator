@@ -1,8 +1,13 @@
+---
+name: SPECS
+description: Always use this prompt. 
+---
+
 # QR Code Generator SPECS
 
 ## Overview
 
-A browser-based QR code generator in a single `index.html` file. Features input-based generation, live preview, download in PNG/JPG/SVG, padding and drop-shadow shader, and URL parameter support.
+A browser-based QR code generator in a single `index.html` file. Features input-based generation, live preview, download in PNG/JPG/SVG, padding and drop-shadow shader, and URL parameter support. The specification defines the requirements, features, behaviors, API contract, accessibility considerations, testing steps, and change log for the project. You must always follow these specifications when making changes to the QR code generator. 
 
 ## Requirements
 
@@ -53,7 +58,3 @@ A browser-based QR code generator in a single `index.html` file. Features input-
 2. Verify export buttons produce correct file.
 3. Confirm URL param feature: open with `?text=hello&filetype=png` and file downloads.
 4. Confirm `shadow` toggle and `padding` slider impact rendering.
-
-## Change log
-
-- v1.0: initial build with full feature set and GET provisioning.
