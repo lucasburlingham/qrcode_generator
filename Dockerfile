@@ -9,8 +9,8 @@ WORKDIR /var/www/html
 COPY app/nginx.conf /etc/nginx/nginx.conf
 COPY app /var/www/html
 
-# Ensure data folder exists and right perms
-RUN mkdir -p /var/www/html/data && chown -R www-data:www-data /var/www/html
+# Ensure data folder exists and right perms, use location outside document root
+RUN mkdir -p /var/qrdata && chown -R www-data:www-data /var/qrdata /var/www/html
 
 EXPOSE 80
 

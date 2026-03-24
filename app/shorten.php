@@ -1,110 +1,106 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
 
-$dbFile = __DIR__ . '/data/links.sqlite';
-if (!is_dir(__DIR__ . '/data'))
+$config = require __DIR__ . '/config.php';
+
+function respond($status, $data)
 {
-	mkdir(__DIR__ . '/data', 0755, true);
+    http_response_code($status);
+    echo json_encode($data, JSON_UNESCAPED_SLASHES);
+    exit;
 }
 
-$pdo = new PDO('sqlite:' . $dbFile);
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$pdo->exec('CREATE TABLE IF NOT EXISTS links (code TEXT PRIMARY KEY, url TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL)');
+function getPDO(array $config)
+{
+    $dbPath = $config['db_path'];
+    $dbDir = dirname($dbPath);
 
-$payload = null;
+    if (!is_dir($dbDir) && !mkdir($dbDir, 0750, true) && !is_dir($dbDir)) {
+        respond(500, ['error' => 'Server error']);
+    }
+
+    $pdo = new PDO('sqlite:' . $dbPath);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->exec('CREATE TABLE IF NOT EXISTS links (code TEXT PRIMARY KEY, url TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL)');
+
+    return $pdo;
+}
+
+function allowedScheme(string $url, array $allowed): bool
+{
+    $scheme = strtolower(parse_url($url, PHP_URL_SCHEME) ?: '');
+    return in_array($scheme, $allowed, true);
+}
+
+function generateCode(array $config, PDO $pdo): ?string
+{
+    $charset = $config['code_charset'];
+    $length = max(4, (int)$config['code_length']);
+    $maxTries = 16;
+
+    for ($i = 0; $i < $maxTries; $i++) {
+        $candidate = '';
+        for ($j = 0; $j < $length; $j++) {
+            $candidate .= $charset[random_int(0, strlen($charset) - 1)];
+        }
+
+        $stmt = $pdo->prepare('SELECT 1 FROM links WHERE code = :code LIMIT 1');
+        $stmt->execute([':code' => $candidate]);
+        if ($stmt->fetch() === false) {
+            return $candidate;
+        }
+    }
+
+    return null;
+}
+
 $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
-if (stripos($contentType, 'application/json') !== false)
-{
-	$raw = file_get_contents('php://input');
-	$payload = json_decode($raw, true);
-}
-else
-{
-	$payload = $_POST;
+$payload = null;
+
+if (stripos($contentType, 'application/json') !== false) {
+    $raw = file_get_contents('php://input');
+    $payload = json_decode($raw, true);
+} else {
+    $payload = $_POST;
 }
 
-if (empty($payload['url']))
-{
-	http_response_code(400);
-	echo json_encode(['error' => 'URL is required']);
-	exit;
+if (!is_array($payload) || empty($payload['url'])) {
+    respond(400, ['error' => 'url is required']);
 }
 
 $url = trim($payload['url']);
-if (!filter_var($url, FILTER_VALIDATE_URL))
-{
-	http_response_code(400);
-	echo json_encode(['error' => 'Invalid URL format']);
-	exit;
+if (strlen($url) > $config['max_url_length']) {
+    respond(400, ['error' => 'url too long']);
 }
 
-$allowedSchemes = ['https', 'ftps', 'sftp', 'ftp', 'mailto', 'ssh'];
-$scheme = strtolower(parse_url($url, PHP_URL_SCHEME) ?: '');
-if (!in_array($scheme, $allowedSchemes, true))
-{
-	http_response_code(400);
-	echo json_encode(['error' => 'Invalid URL scheme. Allowed: https, ftps, sftp, ftp, mailto, ssh, ws, wss']);
-	exit;
+if (!filter_var($url, FILTER_VALIDATE_URL) || !allowedScheme($url, $config['allowed_schemes'])) {
+    respond(400, ['error' => 'invalid url']);
 }
 
-if (strlen($url) > 2048)
-{
-	http_response_code(400);
-	echo json_encode(['error' => 'URL too long']);
-	exit;
-}
+try {
+    $pdo = getPDO($config);
 
-try
-{
-	// check for existing URL
-	$stmt = $pdo->prepare('SELECT code FROM links WHERE url = :url LIMIT 1');
-	$stmt->execute([':url' => $url]);
-	$row = $stmt->fetch(PDO::FETCH_ASSOC);
-	if ($row)
-	{
-		$code = $row['code'];
-	}
-	else
-	{
-		$characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-		$maxTry = 8;
+    $stmt = $pdo->prepare('SELECT code FROM links WHERE url = :url LIMIT 1');
+    $stmt->execute([':url' => $url]);
+    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
-		$code = null;
-		for ($i = 0; $i < $maxTry; $i++)
-		{
-			$candidate = '';
-			for ($j = 0; $j < 4; $j++)
-			{
-				$candidate .= $characters[random_int(0, strlen($characters) - 1)];
-			}
-			$stmt = $pdo->prepare('SELECT 1 FROM links WHERE code = :code LIMIT 1');
-			$stmt->execute([':code' => $candidate]);
-			if (!$stmt->fetch())
-			{
-				$code = $candidate;
-				break;
-			}
-		}
+    if ($existing !== false) {
+        $code = $existing['code'];
+    } else {
+        $code = generateCode($config, $pdo);
+        if ($code === null) {
+            respond(500, ['error' => 'Could not generate short code']);
+        }
 
-		if (empty($code))
-		{
-			throw new RuntimeException('Could not generate a unique short code. Try again.');
-		}
+        $insert = $pdo->prepare('INSERT INTO links (code, url, created_at) VALUES (:code, :url, :created_at)');
+        $insert->execute([':code' => $code, ':url' => $url, ':created_at' => date('c')]);
+    }
 
-		$insert = $pdo->prepare('INSERT INTO links (code, url, created_at) VALUES (:code, :url, :created_at)');
-		$insert->execute([':code' => $code, ':url' => $url, ':created_at' => date('c')]);
-	}
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $config['canonical_host'] ?: ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    $shortUrl = sprintf('%s://%s/s/%s', $protocol, $host, $code);
 
-	$host = $_SERVER['HTTP_HOST'];
-	$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-	$shortUrl = sprintf('%s://%s/s/%s', $scheme, $host, $code);
-
-	echo json_encode(['short_url' => $shortUrl, 'code' => $code, 'url' => $url]);
-	exit;
-}
-catch (Exception $e)
-{
-	http_response_code(500);
-	echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
-	exit;
+    respond(201, ['short_url' => $shortUrl, 'code' => $code, 'url' => $url]);
+} catch (Exception $e) {
+    respond(500, ['error' => 'Internal server error']);
 }
