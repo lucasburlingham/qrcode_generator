@@ -116,6 +116,11 @@
 			min-height: 80px;
 		}
 
+		.hint-text {
+			color: #64748b;
+			font-size: 0.9rem;
+		}
+
 		.shortener-area {
 			display: flex;
 			flex-direction: column;
@@ -140,6 +145,10 @@
 			min-width: 160px;
 		}
 
+		.shortener-info {
+			color: #475569;
+			font-size: 0.87rem;
+		}
 
 		.color-row {
 			display: flex;
@@ -159,7 +168,8 @@
 			flex-wrap: wrap;
 		}
 
-		.button-row button {
+		.button-row button,
+		.shortener-actions button {
 			background: #2563eb;
 			border: 0;
 			border-radius: 8px;
@@ -170,7 +180,8 @@
 			transition: filter .2s ease;
 		}
 
-		.button-row button:hover {
+		.button-row button:hover,
+		.shortener-actions button:hover {
 			filter: brightness(1.08);
 		}
 
@@ -283,17 +294,18 @@
 		<section class="panel" aria-label="URL shortener panel">
 			<h2>Shorten URL</h2>
 			<div class="field shortener-area">
+				<input id="shorten-output" type="text" readonly placeholder="Short URL appears here" />
 				<div class="shortener-actions">
 					<button id="shorten-btn" class="secondary">Shorten URL (4 chars)</button>
+					<button id="apply-short-url-btn" class="secondary">Use short URL in QR + clear input</button>
 					<button id="copy-short-url-btn" class="secondary">Copy Short URL</button>
 				</div>
-				<input id="shorten-output" type="text" readonly placeholder="Short URL appears here" />
 				<small id="shorten-status" class="shortener-info">Post and create a short link.</small>
 			</div>
 		</section>
 
 		<section class="panel" aria-label="QR output panel">
-			<h2>4. Output preview</h2>
+			<h2>Output preview</h2>
 			<div id="output-wrapper">
 				<canvas id="output-canvas" width="320" height="320" aria-label="QR code canvas"></canvas>
 				<div id="output-svg" class="hidden" aria-label="QR code SVG"></div>
@@ -476,6 +488,7 @@
 		});
 
 		const shortenBtn = document.getElementById('shorten-btn');
+		const applyShortUrlBtn = document.getElementById('apply-short-url-btn');
 		const shortenOutput = document.getElementById('shorten-output');
 		const copyShortUrlBtn = document.getElementById('copy-short-url-btn');
 		const shortenStatus = document.getElementById('shorten-status');
@@ -520,6 +533,16 @@
 				shortenStatus.textContent = 'Clipboard error';
 				console.error(err);
 			});
+		});
+
+		applyShortUrlBtn.addEventListener('click', () => {
+			if (!shortenOutput.value) return alert('Generate and set a shortened URL first.');
+			textInput.value = shortenOutput.value;
+			shortenStatus.textContent = 'Short URL applied and input cleared.';
+			setTimeout(() => {
+				textInput.value = '';
+				renderQRCode();
+			}, 100);
 		});
 
 		// Generate initial example QR code (and support GET config / download)
