@@ -1,5 +1,5 @@
 # PHP + Nginx container for static QR generator + URL shortener
-FROM php:8.2-fpm-alpine
+FROM php:8.5-fpm-alpine
 
 RUN apk add --no-cache nginx
 
