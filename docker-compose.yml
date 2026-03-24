@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  web:
+    build: .
+    image: qrcode_generator:latest
+    ports:
+      - "8080:80"
+    volumes:
+      - data:/var/www/html/data
+    working_dir: /var/www/html
+    restart: unless-stopped
+
+volumes:
+  data:
