@@ -1,6 +1,6 @@
 ---
 description: Keep README in sync whenever project files change
-applyTo: '*'
+applyTo: '*.md'
 ---
 
 When editing or adding source files in this repository, update `README.md` with a brief note describing the change and any new usage instructions. This includes:
