@@ -91,6 +91,7 @@
 			align-items: center;
 			gap: 6px;
 		}
+
 		.color-row input[type="color"] {
 			width: 2.5em;
 			height: 2.5em;
@@ -115,6 +116,40 @@
 			min-height: 80px;
 		}
 
+		.hint-text {
+			color: #64748b;
+			font-size: 0.9rem;
+		}
+
+		.shortener-area {
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+		}
+
+		.shortener-actions {
+			display: flex;
+			gap: 12px;
+			flex-wrap: wrap;
+		}
+
+		.shortener-actions button,
+		.shortener-actions input {
+			padding: 8px 12px;
+			border-radius: 8px;
+		}
+
+		.shortener-actions input {
+			border: 1px solid #dce5f2;
+			width: 100%;
+			min-width: 160px;
+		}
+
+		.shortener-info {
+			color: #475569;
+			font-size: 0.87rem;
+		}
+
 		.color-row {
 			display: flex;
 			gap: 12px;
@@ -133,7 +168,8 @@
 			flex-wrap: wrap;
 		}
 
-		.button-row button {
+		.button-row button,
+		.shortener-actions button {
 			background: #2563eb;
 			border: 0;
 			border-radius: 8px;
@@ -144,7 +180,8 @@
 			transition: filter .2s ease;
 		}
 
-		.button-row button:hover {
+		.button-row button:hover,
+		.shortener-actions button:hover {
 			filter: brightness(1.08);
 		}
 
@@ -211,7 +248,7 @@
 <body>
 	<main class="app">
 		<section class="panel" aria-label="QR input panel">
-			<h2>1. Enter QR content</h2>
+			<h2>Enter QR content</h2>
 			<div class="field">
 				<label for="text-input">Text / URL</label>
 				<textarea id="text-input" placeholder="Type URL or text here" rows="3"></textarea>
@@ -241,7 +278,7 @@
 			<div class="field">
 				<label for="padding-input">Padding (px)</label>
 				<input id="padding-input" type="range" min="0" max="80" value="8" />
-				<small id="padding-value" style="color:#64748b;">8px</small>
+				<small id="padding-value" class="hint-text">8px</small>
 			</div>
 
 			<div class="button-row">
@@ -250,14 +287,51 @@
 				<button id="download-jpg-btn" class="secondary">Download JPG</button>
 				<button id="download-svg-btn" class="secondary">Download SVG</button>
 			</div>
+
 			<p class="offer">For best results, choose content under 300 characters and size >= 240.</p>
 		</section>
 
+		<section class="panel" aria-label="URL shortener panel">
+			<h2>Shorten URL</h2>
+			<div class="field shortener-area">
+				<input id="shorten-output" type="text" readonly placeholder="Short URL appears here" />
+				<div class="shortener-actions">
+					<button id="shorten-btn" class="secondary">Shorten URL (4 chars)</button>
+					<button id="apply-short-url-btn" class="secondary">Use short URL in QR + clear input</button>
+					<button id="copy-short-url-btn" class="secondary">Copy Short URL</button>
+					<button href="links.html" class="secondary">View all links table</button>
+				</div>
+				<small id="shorten-status" class="shortener-info">Post and create a short link.</small>
+			</div>
+		</section>
+
 		<section class="panel" aria-label="QR output panel">
-			<h2>2. Output preview</h2>
+			<h2>Output preview</h2>
 			<div id="output-wrapper">
 				<canvas id="output-canvas" width="320" height="320" aria-label="QR code canvas"></canvas>
 				<div id="output-svg" class="hidden" aria-label="QR code SVG"></div>
+			</div>
+		</section>
+
+		<section class="panel" aria-label="All short links table">
+			<h2>All shortened links</h2>
+			<div class="shortener-actions">
+				<button id="load-links-btn" class="secondary">Load all links</button>
+				<button id="refresh-links-btn" class="secondary">Refresh</button>
+			</div>
+			<div class="field" style="overflow-x:auto;">
+				<table id="links-table" style="width:100%; border-collapse:collapse; margin-top:10px; display:none;">
+					<thead>
+						<tr>
+							<th style="text-align:left;padding:8px;border-bottom:1px solid #dce5f2;">Code</th>
+							<th style="text-align:left;padding:8px;border-bottom:1px solid #dce5f2;">Original URL</th>
+							<th style="text-align:left;padding:8px;border-bottom:1px solid #dce5f2;">Short URL</th>
+							<th style="text-align:left;padding:8px;border-bottom:1px solid #dce5f2;">Created</th>
+						</tr>
+					</thead>
+					<tbody id="links-table-body"></tbody>
+				</table>
+				<p id="links-status" class="offer">Click “Load all links” to display the table.</p>
 			</div>
 		</section>
 	</main>
@@ -435,6 +509,108 @@
 			if (!textInput.value.trim()) { return alert('Add text or URL first.'); }
 			downloadSVG('qrcode.svg');
 		});
+
+		const shortenBtn = document.getElementById('shorten-btn');
+		const applyShortUrlBtn = document.getElementById('apply-short-url-btn');
+		const shortenOutput = document.getElementById('shorten-output');
+		const copyShortUrlBtn = document.getElementById('copy-short-url-btn');
+		const shortenStatus = document.getElementById('shorten-status');
+
+		async function shortenUrl() {
+			const original = textInput.value.trim();
+			if (!original) return alert('Enter the URL or text to shorten first.');
+
+			shortenStatus.textContent = 'Shortening...';
+
+			try {
+				const res = await fetch('/shorten.php', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ url: original })
+				});
+
+				if (!res.ok) {
+					const err = await res.json().catch(() => { });
+					throw new Error(err?.error || 'Shortener request failed');
+				}
+
+				const data = await res.json();
+				shortenOutput.value = data.short_url;
+				textInput.value = data.short_url;
+				renderQRCode();
+				shortenStatus.textContent = 'Short URL generated successfully.';
+			} catch (error) {
+				console.error(error);
+				shortenStatus.textContent = 'Error: ' + error.message;
+				alert('Shortener error: ' + error.message);
+			}
+		}
+
+		shortenBtn.addEventListener('click', shortenUrl);
+
+		copyShortUrlBtn.addEventListener('click', () => {
+			if (!shortenOutput.value) return alert('No short URL to copy.');
+			navigator.clipboard.writeText(shortenOutput.value).then(() => {
+				shortenStatus.textContent = 'Copied short URL to clipboard!';
+			}).catch((err) => {
+				shortenStatus.textContent = 'Clipboard error';
+				console.error(err);
+			});
+		});
+
+		applyShortUrlBtn.addEventListener('click', () => {
+			if (!shortenOutput.value) return alert('Generate and set a shortened URL first.');
+			textInput.value = shortenOutput.value;
+			shortenStatus.textContent = 'Short URL applied and input cleared.';
+			setTimeout(() => {
+				textInput.value = '';
+				renderQRCode();
+			}, 100);
+		});
+
+		const linksTable = document.getElementById('links-table');
+		const linksTableBody = document.getElementById('links-table-body');
+		const linksStatus = document.getElementById('links-status');
+		const loadLinksBtn = document.getElementById('load-links-btn');
+		const refreshLinksBtn = document.getElementById('refresh-links-btn');
+
+		async function loadAllLinks() {
+			linksStatus.textContent = 'Loading links...';
+			linksTable.style.display = 'none';
+			linksTableBody.innerHTML = '';
+
+			try {
+				const res = await fetch('/api/links');
+				if (!res.ok) throw new Error('Failed to fetch links');
+				const json = await res.json();
+				const items = json.data || [];
+
+				if (!items.length) {
+					linksStatus.textContent = 'No links have been shortened yet.';
+					return;
+				}
+
+				for (const item of items) {
+					const tr = document.createElement('tr');
+					tr.innerHTML = `
+						<td style="padding:8px;border-bottom:1px solid #eee;">${item.code}</td>
+						<td style="padding:8px;border-bottom:1px solid #eee;"><a href="${item.url}" target="_blank" rel="noopener">${item.url}</a></td>
+						<td style="padding:8px;border-bottom:1px solid #eee;"><a href="/s/${item.code}" target="_blank" rel="noopener">/s/${item.code}</a></td>
+						<td style="padding:8px;border-bottom:1px solid #eee;">${new Date(item.created_at).toLocaleString()}</td>
+					`;
+					linksTableBody.appendChild(tr);
+				}
+
+				linksTable.style.display = 'table';
+				linksStatus.textContent = `Loaded ${items.length} link${items.length !== 1 ? 's' : ''}.`;
+			} catch (err) {
+				console.error(err);
+				linksStatus.textContent = 'Error loading links: ' + err.message;
+			}
+		}
+
+		loadLinksBtn.addEventListener('click', loadAllLinks);
+		refreshLinksBtn.addEventListener('click', loadAllLinks);
 
 		// Generate initial example QR code (and support GET config / download)
 		window.addEventListener('DOMContentLoaded', () => {
