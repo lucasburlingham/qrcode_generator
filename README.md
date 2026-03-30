@@ -22,6 +22,7 @@ A lightweight single-page QR code generator. This project is designed for fast l
 ## URL Query Parameters
 
 Set values via query string (works on load):
+
 - `text` (e.g., `hello`)
 - `size` (e.g., `320`)
 - `fg` (hex color, URL-encoded, e.g. `%230f172a`)
