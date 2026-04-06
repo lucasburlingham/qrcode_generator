@@ -50,3 +50,5 @@ No build tools required. Edit `index.html` directly.
 ## License
 
 The Creator's License (lucasburlingham.me/license.html) - free for personal and commercial use with attribution. See license for details.
+
+Some or all of the code in this repo may be generated with AI assistance. 
