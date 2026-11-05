@@ -47,71 +47,49 @@ index.html?text=https%3A%2F%2Fexample.com&size=480&fg=%23000000&bg=%23ffffff&pad
 
 No build tools required. Edit `index.html` directly.
 
-### URL shortener backend
+## Deployment
 
-This project now includes an integrated link shortener with 4-character codes, backed by SQLite. App code lives in `app/`.
-
-Endpoints:
-
-- `POST /shorten.php` (legacy) or `POST /api/links` with JSON `{ "url": "https://example.com" }` returns `{ "data": { "code": "Ab1c", "url": "https://example.com", "short_url": "http://<host>/s/Ab1c" }}`.
-  Allowed URI schemes: `https`, `ftps`, `sftp`, `ftp`, `mailto`, `ssh`.
-- `GET /api/links` returns all shortened links.
-- `GET /api/links/<code>` returns metadata for a single short code.
-- `GET /s/<code>` redirects to original URL.
-
-Updates are disallowed: `PUT`, `PATCH`, `DELETE` return `405 Method not allowed`.
+This project runs as a static site served by **nginx only** (no PHP or backend required).
 
 ### Docker support
 
-A Docker configuration has been added for containerized hosting of this app with PHP-FPM + Nginx.
+A lightweight Docker configuration for containerized hosting using nginx.
 
-- `Dockerfile` uses `php:8.2-fpm-alpine`, installs `nginx`, and copies `app/` into `/var/www/html`.
-- `docker-compose.yml` maps host `8080` to container `80`, uses a named volume `data` for SQLite storage.
-- `.dockerignore` excludes common unwanted files and local output directories.
+- `Dockerfile` uses `nginx:alpine` for a minimal production-ready image
+- `docker-compose.yml` maps host `8080` to container `80`
+- `.dockerignore` excludes common unwanted files and local output directories
 
-App files are now in `app/`:
+App files are in `app/`:
 
 - `app/index.html` (UI)
-- `app/nginx.conf` (routing)
-- `app/shorten.php` (legacy shortener endpoint)
-- `app/redirect.php` (short URL redirect)
-- `app/api.php` (REST API for link management)
-
-A companion skill metadata file has been added at `.github/skills/update-build-push-docker.SKILL.md` to document the update/build-push workflow and keep repo operations reproducible.
-
-Markdown style note: Add blank lines before and after headings and list blocks in `.md` files for consistent GFM rendering.
+- `app/nginx.conf` (server configuration)
 
 Run locally:
 
 ```bash
-docker compose up --build -d
+docker compose up -d
+```
+
+Or build and run manually:
+
+```bash
+docker build -t qrcode-generator .
+docker run -p 8080:80 qrcode-generator
 ```
 
 Open in browser:
 
 - `http://localhost:8080`
 
-API usage examples:
-
-```bash
-curl -X POST -H "Content-Type: application/json" -d '{"url":"https://example.com"}' http://localhost:8080/api/links
-curl http://localhost:8080/api/links
-curl http://localhost:8080/api/links/<code>
-```
-
-Short URL redirect:
-
-- `http://localhost:8080/s/<code>`
-
 Push image to Docker Hub (replace `<yourhub>`):
 
 ```bash
 docker login
-docker build -t qrcode_generator:latest .
-docker tag qrcode_generator:latest <yourhub>/qrcode_generator:latest
-docker push <yourhub>/qrcode_generator:latest
+docker build -t qrcode-generator:latest .
+docker tag qrcode-generator:latest <yourhub>/qrcode-generator:latest
+docker push <yourhub>/qrcode-generator:latest
 ```
 
 ## License
 
-The Creator's License (lucasburlingham.me/license.html) - free for personal and commercial use with attribution. See license for details.
+The Creator's License (https://lucasburlingham.me/LICENSE.md) - free for personal and commercial use with attribution. See license for details.

@@ -47,8 +47,31 @@ index.html?text=https%3A%2F%2Fexample.com&size=480&fg=%23000000&bg=%23ffffff&pad
 
 No build tools required. Edit `index.html` directly.
 
+## Deployment
+
+This project runs as a static site served by **nginx only** (no PHP or backend required).
+
+### Docker
+
+Build and run with Docker:
+
+```bash
+docker build -t qrcode-generator .
+docker run -p 8080:80 qrcode-generator
+```
+
+Access at `http://localhost:8080`
+
+### Docker Compose
+
+```bash
+docker compose up
+```
+
+The `Dockerfile` uses `nginx:alpine` for a lightweight, production-ready image.
+
 ## License
 
-The Creator's License (lucasburlingham.me/license.html) - free for personal and commercial use with attribution. See license for details.
+The Creator's License (https://lucasburlingham.me/LICENSE.md) - free for personal and commercial use with attribution. See license for details.
 
 Some or all of the code in this repo may be generated with AI assistance. 
