@@ -67,7 +67,7 @@ App files are in `app/`:
 Run locally:
 
 ```bash
-docker compose up --build -d
+docker compose up -d
 ```
 
 Or build and run manually:
