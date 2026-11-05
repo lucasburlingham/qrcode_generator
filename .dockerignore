@@ -2,7 +2,7 @@
 **/.DS_Store
 *.log
 node_modules
-/data
-/app/vendor
 **/.github
-**/.php_tmp
+.env*
+.vscode
+.idea
